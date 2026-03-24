@@ -2,12 +2,6 @@
 
 > Run real hardware synthesis directly in your browser.  
 > No servers. No installs. Just Verilog → Circuit.
-
-![Status](https://img.shields.io/badge/status-working-brightgreen)
-![Platform](https://img.shields.io/badge/platform-browser-blue)
-![Server](https://img.shields.io/badge/server%20calls-zero-4ecca3)
-![License](https://img.shields.io/badge/license-MIT-yellow)
-
 ---
 
 ## What this is
@@ -146,7 +140,7 @@ Stable state reached
 
 ---
 
-## 🛠️ Tech stack
+## Tech stack
 
 | Layer        | Tool            |
 | ------------ | --------------- |
@@ -215,7 +209,7 @@ WebAssembly + Workers require HTTP.
 
 ---
 
-## 🧪 Try these circuits
+##  Implemented and tested circuits
 
 | Example       | Concept       |
 | ------------- | ------------- |
