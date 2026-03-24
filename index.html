@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Client-Side Verilog Synthesis - Demo</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; }
+        h1 { text-align: center; padding: 15px; background: #16213e; color: #4ecca3; }
+        .subtitle { text-align: center; color: #888; padding: 5px; font-size: 14px; }
+        #status { text-align: center; padding: 10px; font-size: 16px; font-weight: bold; }
+        .ready { color: #4ecca3; }
+        .working { color: #f0a500; }
+        .err { color: #e74c3c; }
+        #main { display: flex; height: calc(100vh - 120px); }
+        #left { width: 35%; padding: 15px; border-right: 2px solid #333; overflow-y: auto; }
+        #right { width: 65%; padding: 15px; background: #fff; overflow: auto; }
+        textarea {
+            width: 100%;
+            background: #0f3460;
+            color: #4ecca3;
+            border: 1px solid #4ecca3;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            resize: vertical;
+        }
+        label { display: block; margin: 10px 0 5px; color: #aaa; }
+        input {
+            background: #0f3460;
+            color: #4ecca3;
+            border: 1px solid #4ecca3;
+            padding: 5px 10px;
+            font-family: monospace;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 5px 0;
+            background: #4ecca3;
+            color: #1a1a2e;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        button:disabled { background: #555; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #3db892; }
+        .ex-btn {
+            background: #0f3460;
+            color: #4ecca3;
+            font-size: 12px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .ex-btn:hover:not(:disabled) { background: #1a4a8a; color: #fff; }
+        #json-output {
+            background: #0a0a1a;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            display: none;
+            margin-top: 5px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .stats {
+            color: #888;
+            font-size: 12px;
+            margin-top: 10px;
+            padding: 8px;
+            background: #16213e;
+            border-radius: 4px;
+        }
+
+        /* ── Digital JS circuit canvas styles ── */
+        #circuit { width: 100%; height: 100%; }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #f0a500;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<h1>Client-Side Verilog Synthesis</h1>
+<div class="subtitle">Yosys WASM + yosys2digitaljs + digitalJS — zero server calls</div>
+<div id="status" class="working">
+    <span class="spinner"></span>Loading Yosys WASM... (first load ~10-30s)
+</div>
+
+<div id="main">
+    <!-- ═══ LEFT PANEL ═══ -->
+    <div id="left">
+        <label>Verilog Input:</label>
+        <textarea id="verilog" rows="12">module mux (
+  input a, b, sel,
+  output y
+);
+  assign y = sel ? b : a;
+endmodule</textarea>
+
+        <label>Top module:</label>
+        <input id="topModule" value="mux">
+
+        <button id="btn" disabled>Synthesize</button>
+
+        <!-- Example presets -->
+        <div style="margin-top:10px">
+            <div style="color:#888;font-size:12px;margin-bottom:5px;">Try these:</div>
+            <button class="ex-btn" id="ex-and">AND Gate</button>
+            <button class="ex-btn" id="ex-counter">4-bit Counter</button>
+            <button class="ex-btn" id="ex-mux">4:1 Mux</button>
+            <button class="ex-btn" id="ex-adder">Full Adder</button>
+            <button class="ex-btn" id="ex-task">POC Mux</button>
+        </div>
+
+        <div class="stats" id="stats"></div>
+
+        <button class="ex-btn" id="json-toggle" style="margin-top:10px">
+            Show JSON Output
+        </button>
+        <div id="json-output"></div>
+    </div>
+
+    <!-- ═══ RIGHT PANEL ═══ -->
+    <div id="right">
+        <div id="circuit"></div>
+    </div>
+</div>
+
+<!-- DigitalJS render bundle (built via webpack) -->
+<script src="dist/render-bundle.js"></script>
+
+<script>
+    // ─── Worker ──────────────────────────────────────────────────────────────
+    var worker = new Worker('worker.js', { type: 'module' });
+
+    // ─── DOM refs ────────────────────────────────────────────────────────────
+    var btn        = document.getElementById('btn');
+    var statusEl   = document.getElementById('status');
+    var jsonOutput = document.getElementById('json-output');
+    var statsDiv   = document.getElementById('stats');
+    var synthStart = 0;
+
+    // ─── Example presets ────────────────────────────────────────────────────
+    var examples = {
+        and: {
+            code: 'module and_gate(\n  input a, b,\n  output y\n);\n  assign y = a & b;\nendmodule',
+            top: 'and_gate'
+        },
+        counter: {
+            code: "module counter(\n  input clk, rst,\n  output reg [3:0] count\n);\n  always @(posedge clk or posedge rst) begin\n    if (rst) count <= 4'b0000;\n    else     count <= count + 1;\n  end\nendmodule",
+            top: 'counter'
+        },
+        mux4: {
+            code: "module mux4(\n  input [3:0] d,\n  input [1:0] sel,\n  output reg y\n);\n  always @(*) begin\n    case(sel)\n      2'b00: y = d[0];\n      2'b01: y = d[1];\n      2'b10: y = d[2];\n      2'b11: y = d[3];\n    endcase\n  end\nendmodule",
+            top: 'mux4'
+        },
+        adder: {
+            code: 'module fulladder(\n  input a, b, cin,\n  output sum, cout\n);\n  assign sum  = a ^ b ^ cin;\n  assign cout = (a & b) | (cin & (a ^ b));\nendmodule',
+            top: 'fulladder'
+        },
+        // This is my exact POC task mux...
+        pocMux: {
+            code: 'module mux (\n  input a, b, sel,\n  output y\n);\n  assign y = sel ? b : a;\nendmodule',
+            top: 'mux'
+        }
+    };
+
+    function loadExample(key) {
+        document.getElementById('verilog').value   = examples[key].code;
+        document.getElementById('topModule').value = examples[key].top;
+    }
+
+    document.getElementById('ex-and').onclick     = () => loadExample('and');
+    document.getElementById('ex-counter').onclick = () => loadExample('counter');
+    document.getElementById('ex-mux').onclick     = () => loadExample('mux4');
+    document.getElementById('ex-adder').onclick   = () => loadExample('adder');
+    document.getElementById('ex-task').onclick    = () => loadExample('pocMux');
+
+    // ─── JSON toggle ─────────────────────────────────────────────────────────
+    document.getElementById('json-toggle').onclick = function () {
+        jsonOutput.style.display =
+            jsonOutput.style.display === 'none' ? 'block' : 'none';
+    };
+
+    // ─── Worker messages ─────────────────────────────────────────────────────
+    worker.onmessage = function (e) {
+        var msg = e.data;
+
+        if (msg.type === 'ready') {
+            statusEl.innerHTML  = ' Yosys WASM Ready!';
+            statusEl.className  = 'ready';
+            btn.disabled        = false;
+            return;
+        }
+
+        if (msg.type === 'success') {
+            var elapsed = Date.now() - synthStart;
+            jsonOutput.textContent = JSON.stringify(msg.json, null, 2);
+
+            try {
+                // Clear previous circuit
+                document.getElementById('circuit').innerHTML = '';
+
+                // Render new circuit via render-bundle.js
+                window.renderCircuit(msg.json, {});
+
+                var modName   = Object.keys(msg.json.modules)[0];
+                var cells     = Object.keys(msg.json.modules[modName].cells  || {}).length;
+                var ports     = Object.keys(msg.json.modules[modName].ports  || {}).length;
+                var nets      = Object.keys(msg.json.modules[modName].netnames || {}).length;
+
+                statsDiv.innerHTML =
+                    ' Synthesis: ' + elapsed + ' ms &nbsp;|&nbsp; ' +
+                    ' Cells: '    + cells    + ' &nbsp;|&nbsp; ' +
+                    ' Ports: '    + ports    + ' &nbsp;|&nbsp; ' +
+                    ' Nets: '     + nets     + ' &nbsp;|&nbsp; ' +
+                    ' Server calls: <b>0</b>';
+
+                statusEl.innerHTML = ' Circuit rendered successfully!';
+                statusEl.className = 'ready';
+
+            } catch (renderErr) {
+                console.error('Render error:', renderErr);
+                statusEl.textContent = ' Synthesis OK — render issue: ' + renderErr.message;
+                statusEl.className   = 'err';
+                statsDiv.innerHTML   = ' time ' + elapsed + ' ms | Render error: ' + renderErr.message;
+            }
+
+            btn.disabled = false;
+            return;
+        }
+
+        if (msg.type === 'error') {
+            jsonOutput.textContent = 'ERROR:\n' + msg.message;
+            jsonOutput.style.display = 'block';
+            statusEl.textContent   = ' Synthesis failed: ' + msg.message;
+            statusEl.className     = 'err';
+            btn.disabled           = false;
+        }
+    };
+
+    worker.onerror = function (err) {
+        statusEl.textContent = ' Worker crashed: ' + err.message;
+        statusEl.className   = 'err';
+        btn.disabled         = false;
+    };
+
+    // ─── Synthesize button ────────────────────────────────────────────────────
+    btn.onclick = function () {
+        var verilog   = document.getElementById('verilog').value.trim();
+        var topModule = document.getElementById('topModule').value.trim();
+
+        if (!verilog) {
+            statusEl.textContent = ' Please enter Verilog code.';
+            statusEl.className   = 'err';
+            return;
+        }
+
+        statusEl.innerHTML = '<span class="spinner"></span>Synthesizing...';
+        statusEl.className = 'working';
+        btn.disabled       = true;
+        synthStart         = Date.now();
+
+        // Clear old output
+        document.getElementById('circuit').innerHTML = '';
+        jsonOutput.textContent = '';
+        statsDiv.innerHTML     = '';
+
+        worker.postMessage({ verilog: verilog, topModule: topModule });
+    };
+</script>
+
+</body>
+</html>
