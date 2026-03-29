@@ -80,10 +80,10 @@
             border-radius: 4px;
         }
 
-        /* ── Digital JS circuit canvas styles ── */
+    /*Digital JS circuit canvas styles */
         #circuit { width: 100%; height: 100%; }
 
-        /* Loading spinner */
+    /* Loading spinner */
         .spinner {
             display: inline-block;
             width: 14px;
@@ -107,7 +107,7 @@
 </div>
 
 <div id="main">
-    <!-- ═══ LEFT PANEL ═══ -->
+    <!-- LEFT PANEL -->
     <div id="left">
         <label>Verilog Input:</label>
         <textarea id="verilog" rows="12">module mux (
@@ -121,8 +121,6 @@ endmodule</textarea>
         <input id="topModule" value="mux">
 
         <button id="btn" disabled>Synthesize</button>
-
-        <!-- Example presets -->
         <div style="margin-top:10px">
             <div style="color:#888;font-size:12px;margin-bottom:5px;">Try these:</div>
             <button class="ex-btn" id="ex-and">AND Gate</button>
@@ -140,7 +138,7 @@ endmodule</textarea>
         <div id="json-output"></div>
     </div>
 
-    <!-- ═══ RIGHT PANEL ═══ -->
+    <!-- right panel -->
     <div id="right">
         <div id="circuit"></div>
     </div>
@@ -150,17 +148,17 @@ endmodule</textarea>
 <script src="dist/render-bundle.js"></script>
 
 <script>
-    // ─── Worker ──────────────────────────────────────────────────────────────
+    //Worker 
     var worker = new Worker('worker.js', { type: 'module' });
 
-    // ─── DOM refs ────────────────────────────────────────────────────────────
+    //DOM refs 
     var btn        = document.getElementById('btn');
     var statusEl   = document.getElementById('status');
     var jsonOutput = document.getElementById('json-output');
     var statsDiv   = document.getElementById('stats');
     var synthStart = 0;
 
-    // ─── Example presets ────────────────────────────────────────────────────
+    //Example presets 
     var examples = {
         and: {
             code: 'module and_gate(\n  input a, b,\n  output y\n);\n  assign y = a & b;\nendmodule',
@@ -196,13 +194,13 @@ endmodule</textarea>
     document.getElementById('ex-adder').onclick   = () => loadExample('adder');
     document.getElementById('ex-task').onclick    = () => loadExample('pocMux');
 
-    // ─── JSON toggle ─────────────────────────────────────────────────────────
+    //JSON toggle 
     document.getElementById('json-toggle').onclick = function () {
         jsonOutput.style.display =
             jsonOutput.style.display === 'none' ? 'block' : 'none';
     };
 
-    // ─── Worker messages ─────────────────────────────────────────────────────
+    //Worker messages 
     worker.onmessage = function (e) {
         var msg = e.data;
 
@@ -220,10 +218,8 @@ endmodule</textarea>
             try {
                 // Clear previous circuit
                 document.getElementById('circuit').innerHTML = '';
-
                 // Render new circuit via render-bundle.js
                 window.renderCircuit(msg.json, {});
-
                 var modName   = Object.keys(msg.json.modules)[0];
                 var cells     = Object.keys(msg.json.modules[modName].cells  || {}).length;
                 var ports     = Object.keys(msg.json.modules[modName].ports  || {}).length;
@@ -265,7 +261,7 @@ endmodule</textarea>
         btn.disabled         = false;
     };
 
-    // ─── Synthesize button ────────────────────────────────────────────────────
+    //Synthesize button
     btn.onclick = function () {
         var verilog   = document.getElementById('verilog').value.trim();
         var topModule = document.getElementById('topModule').value.trim();
