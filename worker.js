@@ -1,10 +1,10 @@
 import { runYosys, Exit as YosysExit }
     from 'https://cdn.jsdelivr.net/npm/@yowasp/yosys/gen/bundle.js';
 
-// ── Tell main thread Yosys is loaded ─────────────────────────────────────────
+// Tell main thread Yosys is loaded 
 self.postMessage({ type: 'ready' });
 
-// ── Listen for synthesis requests ────────────────────────────────────────────
+// Listen for synthesis requests 
 self.onmessage = async (e) => {
     const { verilog, topModule, requestId } = e.data;
 
@@ -13,9 +13,7 @@ self.onmessage = async (e) => {
         const files = { 'input.v': verilog };
 
         // Build the Yosys script
-        // proc   → converts always blocks to logic
-        // opt    → basic optimisation
-        // write_json → emit netlist
+        // block->logic, optimization,netlist
         const top    = topModule ? `; hierarchy -top ${topModule}` : '';
         const script = [
             'read_verilog input.v',
@@ -29,7 +27,7 @@ self.onmessage = async (e) => {
 
         const outputFiles = await runYosys(['-p', script], files);
 
-        // ── Grab output (handle both key formats) ────────────────────────────
+        // Grab output (handle both key formats) 
         const raw =   outputFiles['output.json']
                    ?? outputFiles['/output.json']
                    ?? null;
@@ -41,7 +39,7 @@ self.onmessage = async (e) => {
             );
         }
 
-        // Decode Uint8Array → string if needed
+        // Decode Uint8Array (string if needed)
         const jsonText = (raw instanceof Uint8Array || raw instanceof ArrayBuffer)
             ? new TextDecoder().decode(raw)
             : String(raw);
