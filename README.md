@@ -1,57 +1,49 @@
-#  Yosys Browser POC
+# Yosys Browser POC
 
-> Run real hardware synthesis directly in your browser.  
-> No servers. No installs. Just Verilog → Circuit.
+> Run real hardware synthesis directly in your browser
+> No servers, no installs — just Verilog → Circuit
+
 ---
 
 ## What this is
 
-This project proves something simple but powerful:
+This started as a small experiment to see if something like Yosys could run fully in the browser without any backend.
 
-**You don’t need a backend to do serious EDA work.** It runs **Yosys (a full Verilog synthesis engine)** inside the browser using WebAssembly — and turns your code into an **interactive, simulated circuit** in real time.
-Write Verilog → click a button → Circuit generated.
+It runs **Yosys (a real Verilog synthesis tool)** using WebAssembly and turns the result into an interactive circuit you can play with.
+The idea is pretty simple: write some Verilog, hit synthesize, and see the circuit immediately.
 
 ---
 
 ## What you get
 
--  **Real synthesis** (not a mock parser)
-- **JSON netlist output** (fully inspectable)
--  **Interactive circuit diagram**
--  **Live simulation** (toggle inputs, watch propagation)
--  **100% client-side** — zero server calls
+* Real synthesis (actual Yosys, not a custom parser)
+* JSON netlist output
+* Interactive circuit view
+* Basic simulation (toggle inputs, see outputs change)
+* Runs completely on the client (no server calls)
 
 ---
 
 ## Demo
 
-
-
-> Edit Verilog → Synthesize → Interact with the circuit instantly.
+> Edit Verilog → Synthesize → interact with the circuit
 
 ---
 
-##  How it works (high-level)
+## How it works (high-level)
 
 ```
-
 Verilog
-│
-▼
-Yosys (WASM in Web Worker)
-│
-▼
-JSON Netlist
-│
-▼
+  ↓
+Yosys (WASM in a worker)
+  ↓
+JSON netlist
+  ↓
 yosys2digitaljs
-│
-▼
-DigitalJS Renderer
-│
-▼
-Interactive Circuit
-
+  ↓
+DigitalJS
+  ↓
+Interactive circuit
 ```
 
 ---
@@ -59,29 +51,27 @@ Interactive Circuit
 ## Architecture
 
 ```
+Browser
 
-BROWSER
-│
-├── Main Thread (UI)
-│     ├── Editor (Verilog input)
-│     ├── Controls (Synthesize button)
-│     └── Canvas (DigitalJS)
+├── Main thread
+│   ├── Editor
+│   ├── Controls
+│   └── Canvas (DigitalJS)
 │
 ├── Web Worker
-│     ├── Yosys WASM (~8MB)
-│     └── runYosys()
+│   ├── Yosys WASM (~8MB)
+│   └── runYosys()
 │
-└── Render Bundle
-├── yosys2digitaljs
-└── DigitalJS
-
-````
+└── Render layer
+    ├── yosys2digitaljs
+    └── DigitalJS
+```
 
 ---
 
 ## Inside the pipeline
 
-### 1. Synthesis (real Yosys)
+### 1. Synthesis
 
 ```js
 const script = `
@@ -94,7 +84,7 @@ const script = `
 const result = await runYosys(['-p', script], {
   'input.v': verilogCode
 });
-````
+```
 
 ---
 
@@ -109,18 +99,14 @@ const json = JSON.parse(new TextDecoder().decode(raw));
 
 ### 3. Netlist → Circuit
 
-| Yosys Cell | Becomes     |
+| Yosys Cell | Maps to     |
 | ---------- | ----------- |
 | `$and`     | AND gate    |
 | `$or`      | OR gate     |
 | `$mux`     | Multiplexer |
 | `$dff`     | Flip-flop   |
 
-Each becomes a live object with:
-
-* state (`0 / 1`)
-* connections
-* update logic
+Each element becomes a small component with its own state, connections, and update logic.
 
 ---
 
@@ -129,13 +115,13 @@ Each becomes a live object with:
 ```
 Input change
    ↓
-Trigger connected gates
+Propagate to connected gates
    ↓
 Recompute outputs
    ↓
-Propagate forward
+Forward propagation
    ↓
-Stable state reached 
+Stable state
 ```
 
 ---
@@ -158,10 +144,10 @@ Stable state reached
 
 ```
 yosys-poc/
-│
-├── index.html        # UI + canvas
-├── worker.js         # Yosys runner (WASM)
-├── bundle.js         # render entry
+
+├── index.html
+├── worker.js
+├── bundle.js
 ├── webpack.config.js
 │
 ├── dist/
@@ -187,13 +173,13 @@ cd yosys-poc
 npm install
 ```
 
-### 3. Build renderer
+### 3. Build
 
 ```bash
 npx webpack
 ```
 
-### 4. Run server
+### 4. Run
 
 ```bash
 npx serve .
@@ -201,15 +187,13 @@ npx serve .
 
 ---
 
-### Important
+## Note
 
-Do **NOT** open with `file://`
-
-WebAssembly + Workers require HTTP.
+Don’t open with `file://` — WebAssembly and Web Workers need HTTP.
 
 ---
 
-##  Implemented and tested circuits
+## Tested circuits
 
 | Example       | Concept       |
 | ------------- | ------------- |
@@ -236,10 +220,10 @@ endmodule
 
 ## Limitations
 
-* First load takes approx. 10–30s (WASM download, cached after)
-* Large designs can be slow
-* Requires modern browser
-* No persistence (yet)
+* First load takes ~10–30s (WASM download, then cached)
+* Larger circuits can be slow
+* Requires a modern browser
+* No persistence yet
 
 ---
 
@@ -247,25 +231,22 @@ endmodule
 
 | Browser | Status |
 | ------- | ------ |
-| Chrome  | Yes      |
-| Edge    | Yes      |
-| Firefox | Yes     |
-| Safari  | Yes     |
+| Chrome  | Yes    |
+| Edge    | Yes    |
+| Firefox | Yes    |
+| Safari  | Yes    |
 | IE      | No     |
 
 ---
 
 ## Why this project matters
 
-It shows that:
-
-* Heavy compute tools **can run fully client-side**
-* EDA workflows can be **instant and interactive**
-* Browsers are capable of **real engineering workloads**
+It shows that tools like Yosys can run directly in the browser and still be useful.
+You can go from code to a working circuit instantly without setting anything up.
 
 ---
 
-##  License
+## License
 
 MIT
 
@@ -280,8 +261,4 @@ MIT
 
 ---
 
-*Built as a proof-of-concept for project 7- client side verilog synthesis.*
-
-```
-```
-
+*Built as a small proof-of-concept for client-side Verilog synthesis.*
