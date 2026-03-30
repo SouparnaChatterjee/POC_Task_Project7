@@ -15,6 +15,7 @@ The idea is pretty simple: write some Verilog, hit synthesize, and see the circu
 ---
 
 ## What you get
+<img width="1918" height="1032" alt="image" src="https://github.com/user-attachments/assets/ea41d467-f8a6-446f-912b-3e66906721c3" />
 
 * Real synthesis (actual Yosys, not a custom parser)
 * JSON netlist output
